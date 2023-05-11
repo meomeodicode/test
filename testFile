@@ -1,0 +1,238 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <SFML/Graphics.hpp>
+#include "StaffSearchClassScore.h"
+#include "struct.h"
+using namespace sf;
+using namespace std;
+
+void addStudentToClass(Class*& classHead, string& id, string& firstName, string& lastName, string& gender)
+{
+    // Create a new Student instance
+    Student* newStudent = new Student;
+
+    // Assign values to its properties
+    newStudent->id = id;
+    newStudent->firstName = firstName;
+    newStudent->lastName = lastName;
+    newStudent->gender = gender;
+
+    // Add the new student to the beginning of the students list
+    if (classHead->studentHead == nullptr)
+    {
+        classHead->studentHead = newStudent;
+        classHead->studentHead->pNext = nullptr;
+        classHead->studentHead->pPrev = nullptr;
+    }
+    else
+    {
+        classHead->studentHead->pPrev = newStudent;
+        newStudent->pNext = classHead->studentHead;
+        newStudent->pPrev = nullptr;
+        classHead->studentHead = newStudent;
+    }
+}
+
+void addCourseToStudent(Student*& curStu, string& courseID)
+{
+    Course* newCourse = new Course;
+    // Assign values to its properties
+    newCourse->id = courseID;
+    if (curStu->courseEnrolHead == nullptr)
+    {
+        curStu->courseEnrolHead = newCourse;
+        newCourse->pNext = nullptr;
+        newCourse->pPrev = nullptr;
+    }
+    else
+    {
+        curStu->courseEnrolHead->pPrev = newCourse;
+        newCourse->pNext = curStu->courseEnrolHead;
+        newCourse->pPrev = nullptr;
+        curStu->courseEnrolHead = newCourse;
+    }
+}
+
+void updateCourseMark(Student*& curStu, string& courseId, string & final, string& total)
+{
+    if (curStu == nullptr)
+        cout << "Empty";
+    else
+    {
+        Course* iter = curStu->courseEnrolHead;
+        if (iter == nullptr)
+            cout << "check1";
+        while (iter)
+        {
+            if (iter->id == courseId)
+            {
+                iter->totalMark = total;
+                iter->finalMark = final;
+            }
+            iter = iter->pNext;
+        }
+
+    }
+}
+void display(RenderWindow& app, string className)
+{
+    //get staff info
+    ifstream Staff("Src / FileCSV / AccountStaff.csv");
+    string staffpassword, staffid, line;
+    while (getline(Staff, line))
+    {
+        stringstream ss(line);
+        string tmp;
+        int cnt = 1;
+        while (getline(ss, tmp, ','))
+        {
+            if (cnt == 1)
+            {
+                staffid = tmp;
+                ++cnt;
+            }
+            else
+            {
+                staffpassword = tmp;
+                ++cnt;
+            }
+        }
+    }
+    //open class file
+    string filename = "Src/FileCSV/" + className + ".csv";
+    int numOfStu = 0;
+    Class* classHead = new Class;
+    classHead->className = className;
+    classHead->pNext = nullptr;
+    classHead->studentHead = nullptr;
+    ifstream in(filename);
+    string tmp;
+    double* overallGPA = new double[121];
+    while (getline(in, line))
+    {
+        stringstream ss(line);
+        int cnt = 1;
+        string id, firstname, lastname, gender, tmp, skip;
+        while (getline(ss, tmp, ','))
+        {
+            if (cnt == 1)
+            {
+                id = tmp;
+                ++cnt;
+            }
+            else if (cnt == 2)
+            {
+                firstname = tmp;
+                ++cnt;
+            }
+            else if (cnt == 3)
+            {
+                lastname = tmp;
+                ++cnt;
+            }
+            else if (cnt == 4)
+            {
+                gender = tmp;
+                ++cnt;
+                addStudentToClass(classHead, id, firstname, lastname, gender);
+                numOfStu++;
+            }
+            getline(ss, skip, ',');
+            getline(ss, skip, ',');
+            getline(ss, skip, ',');
+            string line3, courseID;
+            stringstream ss(skip);
+            getline(in, skip);
+            stringstream ss2(line3);
+            Student* curStu = classHead->studentHead;
+            while (getline(ss, courseID, ','))
+                addCourseToStudent(curStu, courseID);
+        }
+    }
+    Student* cur = classHead->studentHead;
+    if (cur == nullptr)
+        cout << "Error1";
+    else
+    {
+        while (cur)
+        {
+            int stuIndex = 1;
+            Course* tracking = cur->courseEnrolHead;
+            if (tracking == nullptr)
+                cout << "Error2";
+            else
+            {
+                while (tracking)
+                {
+                    string filename = "Src/FileCSV/" + tracking->id + ".csv";
+                    ifstream inCourse(filename);
+                    string line, tmp, skip, skipline;
+                    int cnt = 1;
+                    getline(in, skipline);
+                    while (getline(inCourse, line))
+                    {
+                        cnt++;
+                        stringstream ss(line);
+                        while (getline(ss, tmp, ','))
+                        {
+                            string otherMark, finalMark, midtermMark, totalMark;
+                            if (cnt == 1)
+                            {
+                                if (tmp == cur->id)
+                                {
+                                    getline(ss, skip, ',');
+                                    getline(ss, skip, ',');
+                                    if (cnt == 2)
+                                    {
+                                        otherMark = tmp;
+                                        ++cnt;
+                                    }
+                                    else if (cnt == 3)
+                                    {
+                                        midtermMark = tmp;
+                                        ++cnt;
+                                    }
+                                    else if (cnt == 4)
+                                    {
+                                        finalMark = tmp;
+                                        ++cnt;
+                                    }
+                                    else if (cnt == 5)
+                                    {
+                                        totalMark = tmp;
+                                        ++cnt;
+                                        updateCourseMark(cur, tracking->id, finalMark, totalMark);
+                                        overallGPA[stuIndex] += stod(totalMark);
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+                    tracking = tracking->pNext;
+                }
+            }
+            overallGPA[stuIndex] /= 2.5;
+            cur = cur->pNext;
+        }
+    }
+    Student** tmplist = new Student * [numOfStu+1];
+    string** individual = new string * [numOfStu+1];
+    for (int i = 0; i < numOfStu; i++)
+        individual[i] = new string[2];
+    int cnt = 0;
+    for (Student* it = classHead->studentHead; it != nullptr; it = it->pNext)
+    {
+        ++cnt;
+        tmplist[cnt] = it;
+        int tmp = 1;
+        for (Course* it2 = it->courseEnrolHead; it != nullptr; it = it->pNext)
+        {
+            individual[tmp][0] = it2->finalMark;
+            individual[tmp][1] = it2->totalMark;
+            ++tmp;
+        }
+    }
+   }
